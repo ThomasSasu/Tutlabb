@@ -1001,7 +1001,7 @@ function BecomeTutor({ nav, user }) {
 }
 
 function TutorApplicationsAdmin({ nav, user }) {
-  const adminEmail = "sasuthomasansong@gmail.com";
+  const adminEmail = "ansongsx@gmail.com";
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

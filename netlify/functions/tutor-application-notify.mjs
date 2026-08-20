@@ -6,7 +6,7 @@ export default async (request) => {
   const url = process.env.SUPABASE_URL;
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const resendKey = process.env.RESEND_API_KEY;
-  const reviewer = process.env.REVIEWER_EMAIL || "sasuthomasansong@gmail.com";
+  const reviewer = process.env.REVIEWER_EMAIL || "ansongsx@gmail.com";
   const from = process.env.EMAIL_FROM;
   if (!url || !secret || !resendKey || !from) return Response.json({ sent: false, error: "Notification service is not configured." }, { status: 503 });
   const token = request.headers.get("authorization")?.replace(/^Bearer /, "");

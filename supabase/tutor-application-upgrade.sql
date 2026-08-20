@@ -10,7 +10,7 @@ alter table public.tutor_applications add column if not exists reviewed_at times
 
 create or replace function public.is_tutor_reviewer()
 returns boolean language sql stable security definer set search_path = '' as $$
-  select lower(coalesce(auth.jwt() ->> 'email', '')) = 'sasuthomasansong@gmail.com';
+  select lower(coalesce(auth.jwt() ->> 'email', '')) = 'ansongsx@gmail.com';
 $$;
 
 drop policy if exists "submit own application" on public.tutor_applications;
@@ -72,4 +72,4 @@ create policy "reviewer creates tutors" on public.tutors for insert to authentic
 drop policy if exists "reviewer updates tutors" on public.tutors;
 create policy "reviewer updates tutors" on public.tutors for update to authenticated using (public.is_tutor_reviewer()) with check (public.is_tutor_reviewer());
 
-update public.profiles set role='admin' where lower(email)='sasuthomasansong@gmail.com';
+update public.profiles set role='admin' where lower(email)='ansongsx@gmail.com';
