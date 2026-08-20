@@ -26,10 +26,10 @@ create table if not exists public.bookings (id uuid primary key default gen_rand
 create table if not exists public.login_notifications (id uuid primary key default gen_random_uuid(), user_id uuid references public.profiles(id) on delete cascade, event_key text not null unique, provider text, sent_at timestamptz, created_at timestamptz not null default now());
 
 -- Automatically create a profile after email or OAuth signup.
-create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
+create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles (id, first_name, last_name, email, phone, email_verified)
-  values (new.id, coalesce(new.raw_user_meta_data->>'first_name', split_part(coalesce(new.raw_user_meta_data->>'full_name',''), ' ', 1)), coalesce(new.raw_user_meta_data->>'last_name',''), coalesce(new.email,''), new.raw_user_meta_data->>'phone', new.email_confirmed_at is not null)
+  values (new.id, coalesce(nullif(new.raw_user_meta_data->>'first_name',''), nullif(split_part(coalesce(new.raw_user_meta_data->>'full_name',new.raw_user_meta_data->>'name',''), ' ', 1),''), 'Student'), coalesce(new.raw_user_meta_data->>'last_name',''), coalesce(new.email,''), new.raw_user_meta_data->>'phone', new.email_confirmed_at is not null)
   on conflict (id) do update set email=excluded.email, email_verified=excluded.email_verified;
   return new;
 end; $$;
