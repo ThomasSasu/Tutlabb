@@ -225,6 +225,8 @@ function App() {
           <LearnPage nav={nav} />
         ) : page === "/become-a-tutor" ? (
           <BecomeTutor nav={nav} user={user} />
+        ) : page === "/admin/tutor-applications" ? (
+          <TutorApplicationsAdmin nav={nav} user={user} />
         ) : (
           <Home nav={nav} items={marketTutors} user={user} />
         )}
@@ -929,7 +931,7 @@ function BecomeTutor({ nav, user }) {
   const [step, setStep] = useState(0);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [files, setFiles] = useState({ identity: null, academic: null });
+  const [files, setFiles] = useState({ identity: null, academic: null, photo: null });
   const [form, setForm] = useState({
     fullName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() : "",
     country: "", university: "", qualification: "", course: "", courseCode: "",
@@ -942,7 +944,7 @@ function BecomeTutor({ nav, user }) {
   const validate = () => {
     if (step === 0 && (!form.fullName || !form.country || !form.university || !form.qualification || !form.ageConfirmed)) return "Complete every eligibility field and confirm that you are at least 18.";
     if (step === 1 && (!form.course || !form.grade || !files.academic)) return "Add the course, your result, and academic evidence.";
-    if (step === 2 && (form.bio.trim().length < 120 || !form.rate || !form.availability || !form.modes.length)) return "Add a 120-character teaching statement, rate, availability, and lesson mode.";
+    if (step === 2 && (form.bio.trim().length < 120 || !form.rate || !form.availability || !form.modes.length || !files.photo)) return "Add a profile photo, 120-character teaching statement, rate, availability, and lesson mode.";
     if (step === 3 && (!files.identity || !form.accuracyConfirmed || !form.conductConfirmed || !form.documentConsent)) return "Upload identity evidence and accept all declarations.";
     return "";
   };
@@ -961,13 +963,16 @@ function BecomeTutor({ nav, user }) {
         if (file.size > 10 * 1024 * 1024) throw new Error(`${kind} document must be smaller than 10 MB.`);
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         const path = `${user.id}/${applicationId}/${kind}-${safeName}`;
-        const { error: uploadError } = await supabase.storage.from("tutor-verification").upload(path, file, { contentType: file.type });
+        const bucket = kind === "photo" ? "tutor-photos" : "tutor-verification";
+        const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type });
         if (uploadError) throw uploadError;
         paths[`${kind}Path`] = path;
+        if (kind === "photo") paths.photoUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
       }
       const application = { ...form, ...paths, email: user.email, submittedAt: new Date().toISOString(), reviewRubric: ["identity", "academic_evidence", "subject_expertise", "teaching_quality", "professional_conduct"] };
       const { error: insertError } = await supabase.from("tutor_applications").insert({ id: applicationId, user_id: user.id, application, status: "submitted" });
       if (insertError) throw insertError;
+      fetch("/.netlify/functions/tutor-application-notify", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("tutlab_token")}` }, body: JSON.stringify({ applicationId }) }).catch(() => {});
       setStatus("done");
     } catch (submissionError) { setError(submissionError.message); setStatus(""); }
   };
@@ -986,13 +991,48 @@ function BecomeTutor({ nav, user }) {
       <small>STEP {step + 1} OF {steps.length}</small><h2>{steps[step][0]}</h2><p>{steps[step][1]}</p>
       {step === 0 && <><label>Legal name<input required name="fullName" value={form.fullName} onChange={change} placeholder="As shown on your ID"/></label><div className="two-col"><label>Country of residence<input required name="country" value={form.country} onChange={change}/></label><label>University or institution<input required name="university" value={form.university} onChange={change}/></label></div><label>Highest qualification or current programme<input required name="qualification" value={form.qualification} onChange={change} placeholder="e.g. BSc Computer Engineering, Year 3"/></label><label className="application-consent"><input type="checkbox" name="ageConfirmed" checked={form.ageConfirmed} onChange={change}/><span>I confirm that I am at least 18 years old.</span></label></>}
       {step === 1 && <><div className="two-col"><label>Course you want to teach<input required name="course" value={form.course} onChange={change} placeholder="e.g. Calculus II"/></label><label>Course code<input name="courseCode" value={form.courseCode} onChange={change} placeholder="e.g. MATH 201"/></label></div><label>Your grade or result in this course<input required name="grade" value={form.grade} onChange={change} placeholder="Use the grading system on your transcript"/></label><label className="file-field">Academic evidence <small>Transcript, certificate, or official result · PDF/JPG/PNG · max 10 MB</small><input required type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFiles({...files, academic: e.target.files[0]})}/><span>{files.academic?.name || "Choose academic document"}</span></label><p className="review-note"><ShieldCheck/> A reviewer checks that the named institution, course, and result match your application.</p></>}
-      {step === 2 && <><label>Teaching statement <small>{form.bio.length}/600</small><textarea required maxLength="600" name="bio" value={form.bio} onChange={change} placeholder="Explain how you help students understand difficult concepts, structure lessons, and adapt your teaching."/></label><div className="two-col"><label>Teaching experience<select name="experience" value={form.experience} onChange={change}><option value="">Select</option><option>New tutor</option><option>Less than 1 year</option><option>1–3 years</option><option>3+ years</option></select></label><label>Proposed hourly rate<input required type="number" min="1" name="rate" value={form.rate} onChange={change}/></label></div><fieldset><legend>Lesson modes</legend><div className="application-modes">{["online", "in-person"].map((mode) => <button type="button" className={form.modes.includes(mode) ? "selected" : ""} onClick={() => toggleMode(mode)} key={mode}>{mode === "online" ? <Monitor/> : <MapPin/>}{mode}</button>)}</div></fieldset><label>Weekly availability<input required name="availability" value={form.availability} onChange={change} placeholder="e.g. Mon–Thu after 4 PM GMT"/></label><label>Teaching demonstration link <small>Recommended</small><input type="url" name="demoUrl" value={form.demoUrl} onChange={change} placeholder="Public or unlisted video link"/></label></>}
+      {step === 2 && <><label className="file-field">Tutor profile photo <small>Clear, recent head-and-shoulders photo · JPG/PNG · max 5 MB</small><input required type="file" accept=".jpg,.jpeg,.png" onChange={(e) => setFiles({...files, photo: e.target.files[0]})}/><span>{files.photo?.name || "Choose profile photo"}</span></label><label>Teaching statement <small>{form.bio.length}/600</small><textarea required maxLength="600" name="bio" value={form.bio} onChange={change} placeholder="Explain how you help students understand difficult concepts, structure lessons, and adapt your teaching."/></label><div className="two-col"><label>Teaching experience<select name="experience" value={form.experience} onChange={change}><option value="">Select</option><option>New tutor</option><option>Less than 1 year</option><option>1–3 years</option><option>3+ years</option></select></label><label>Proposed hourly rate<input required type="number" min="1" name="rate" value={form.rate} onChange={change}/></label></div><fieldset><legend>Lesson modes</legend><div className="application-modes">{["online", "in-person"].map((mode) => <button type="button" className={form.modes.includes(mode) ? "selected" : ""} onClick={() => toggleMode(mode)} key={mode}>{mode === "online" ? <Monitor/> : <MapPin/>}{mode}</button>)}</div></fieldset><label>Weekly availability<input required name="availability" value={form.availability} onChange={change} placeholder="e.g. Mon–Thu after 4 PM GMT"/></label><label>Teaching demonstration link <small>Recommended before interview</small><input type="url" name="demoUrl" value={form.demoUrl} onChange={change} placeholder="Public or unlisted video link"/></label></>}
       {step === 3 && <><label className="file-field">Government-issued photo ID <small>Passport, national ID, or driver's licence · PDF/JPG/PNG · max 10 MB</small><input required type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFiles({...files, identity: e.target.files[0]})}/><span>{files.identity?.name || "Choose identity document"}</span></label>{[["accuracyConfirmed", "The information and documents I provided are accurate and belong to me."], ["conductConfirmed", "I agree to professional conduct, academic integrity, and student-safety standards."], ["documentConsent", "I consent to Tut Lab using these documents only to evaluate and verify my application."]].map(([name, text]) => <label className="application-consent" key={name}><input type="checkbox" name={name} checked={form[name]} onChange={change}/><span>{text}</span></label>)}<div className="decision-note"><ShieldCheck/><span><b>What happens next</b><small>A reviewer may approve, request more information, invite you to a teaching assessment, or decline. Your profile remains unpublished until approval.</small></span></div></>}
       {error && <div className="form-alert error">{error}</div>}
       <div className="application-actions">{step > 0 && <button type="button" className="outline-btn" onClick={() => { setError(""); setStep(step - 1); }}>Back</button>}<button type="button" className="dark-btn" disabled={status === "submitting"} onClick={step === 3 ? submit : next}>{status === "submitting" ? "Submitting securely…" : step === 3 ? "Submit for review" : "Continue"}<ArrowRight/></button></div>
       <small className="form-note">Documents are private and never displayed on your public profile.</small>
     </form>
   </section>;
+}
+
+function TutorApplicationsAdmin({ nav, user }) {
+  const adminEmail = "sasuthomasansong@gmail.com";
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const load = async () => {
+    if (!supabase || user?.email?.toLowerCase() !== adminEmail) { setLoading(false); return; }
+    const { data, error: loadError } = await supabase.from("tutor_applications").select("*").order("created_at", { ascending: false });
+    if (loadError) setError(loadError.message); else setApplications(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, [user]);
+  const openEvidence = async (path, bucket = "tutor-verification") => {
+    const { data, error: signError } = await supabase.storage.from(bucket).createSignedUrl(path, 300);
+    if (signError) return setError(signError.message);
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+  const review = async (item, status) => {
+    const reason = ["rejected", "more_information"].includes(status) ? window.prompt("Enter the reason the applicant will receive:") : "";
+    if (["rejected", "more_information"].includes(status) && !reason?.trim()) return;
+    setError("");
+    if (status === "approved") {
+      const a = item.application;
+      const { error: tutorError } = await supabase.from("tutors").upsert({ id: item.user_id, user_id: item.user_id, name: a.fullName, course: a.course, school: a.university, price: Number(a.rate), image: a.photoUrl, mode: a.modes.join(" & "), modes: a.modes, available: a.availability, published: true });
+      if (tutorError) return setError(tutorError.message);
+    }
+    const stage = status === "interview_scheduled" ? "interview" : status === "approved" || status === "rejected" ? "complete" : status;
+    const { error: reviewError } = await supabase.from("tutor_applications").update({ status, review_stage: stage, reviewer_id: user.id, decision_reason: reason || null, reviewed_at: ["approved", "rejected"].includes(status) ? new Date().toISOString() : null }).eq("id", item.id);
+    if (reviewError) setError(reviewError.message); else load();
+  };
+  if (!user) return <section className="admin-denied"><ShieldCheck/><h1>Admin sign-in required</h1><button className="dark-btn" onClick={() => { localStorage.setItem("tutlab_return_to", "/admin/tutor-applications"); nav("/auth/login"); }}>Continue with Google</button></section>;
+  if (user.email?.toLowerCase() !== adminEmail) return <section className="admin-denied"><ShieldCheck/><h1>Restricted review area</h1><p>This page is available only to the designated tutor reviewer.</p><button className="dark-btn" onClick={() => nav("/")}>Return home</button></section>;
+  return <section className="admin-applications page"><div className="admin-heading"><div><span className="overline">ADMIN REVIEW</span><h1>Tutor applications</h1><p>Interview and approve applicants before their profiles become public.</p></div><button className="outline-btn" onClick={load}>Refresh</button></div>{error && <div className="form-alert error">{error}</div>}{loading ? <p>Loading applications…</p> : !applications.length ? <div className="empty"><ShieldCheck/><h3>No tutor applications yet</h3></div> : <div className="admin-application-list">{applications.map((item) => { const a = item.application || {}; return <article key={item.id}><div className="applicant-head"><img src={a.photoUrl} alt=""/><div><span className={`status-chip status-${item.status}`}>{String(item.status).replaceAll("_", " ")}</span><h2>{a.fullName}</h2><p>{a.course}{a.courseCode ? ` · ${a.courseCode}` : ""} · {a.university}</p></div></div><div className="applicant-facts"><span><b>Result</b>{a.grade}</span><span><b>Experience</b>{a.experience || "Not stated"}</span><span><b>Rate</b>{a.rate}</span><span><b>Availability</b>{a.availability}</span></div><p className="applicant-bio">{a.bio}</p><div className="evidence-actions"><button onClick={() => openEvidence(a.identityPath)}>View ID</button><button onClick={() => openEvidence(a.academicPath)}>View academic evidence</button>{a.demoUrl && <button onClick={() => window.open(a.demoUrl, "_blank", "noopener,noreferrer")}>Teaching demo</button>}</div><div className="review-actions"><button onClick={() => review(item, "more_information")}>Request information</button><button onClick={() => review(item, "interview_scheduled")}>Schedule interview</button><button className="reject" onClick={() => review(item, "rejected")}>Reject</button><button className="approve" onClick={() => review(item, "approved")}>Approve tutor</button></div></article>; })}</div>}</section>;
 }
 
 function AuthPage({ kind, onAuth }) {

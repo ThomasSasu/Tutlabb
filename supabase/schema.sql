@@ -77,6 +77,7 @@ create policy "own bookings" on public.bookings for select using (auth.uid()=use
 
 insert into storage.buckets (id,name,public,file_size_limit) values ('resources','resources',true,10485760) on conflict (id) do nothing;
 insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types) values ('tutor-verification','tutor-verification',false,10485760,array['application/pdf','image/jpeg','image/png']) on conflict (id) do update set public=false,file_size_limit=10485760,allowed_mime_types=excluded.allowed_mime_types;
+insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types) values ('tutor-photos','tutor-photos',true,5242880,array['image/jpeg','image/png']) on conflict (id) do update set public=true,file_size_limit=5242880,allowed_mime_types=excluded.allowed_mime_types;
 drop policy if exists "upload own tutor evidence" on storage.objects;
 create policy "upload own tutor evidence" on storage.objects for insert to authenticated with check (bucket_id='tutor-verification' and (storage.foldername(name))[1]=auth.uid()::text);
 drop policy if exists "read own tutor evidence" on storage.objects;
