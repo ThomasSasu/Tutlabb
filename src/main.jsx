@@ -165,7 +165,11 @@ function App() {
           method: "POST",
           body: JSON.stringify({ provider: session.user.app_metadata?.provider || "social" }),
         }).catch(() => {});
-      if (location.hash.startsWith("#/auth")) location.hash = "/";
+      if (location.hash.startsWith("#/auth")) {
+        const returnTo = localStorage.getItem("tutlab_return_to") || "/";
+        localStorage.removeItem("tutlab_return_to");
+        location.hash = returnTo;
+      }
     };
     supabase.auth.getSession().then(({ data }) => syncSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((event, session) =>
@@ -187,7 +191,9 @@ function App() {
         kind={page.split("/")[2]}
         onAuth={(u) => {
           setUser(u);
-          nav("/");
+          const returnTo = localStorage.getItem("tutlab_return_to") || "/";
+          localStorage.removeItem("tutlab_return_to");
+          nav(returnTo);
         }}
       />
     );
@@ -943,7 +949,10 @@ function BecomeTutor({ nav, user }) {
   const next = () => { const issue = validate(); if (issue) return setError(issue); setError(""); setStep((value) => Math.min(3, value + 1)); };
   const submit = async () => {
     const issue = validate(); if (issue) return setError(issue);
-    if (!user || !supabase) return nav("/auth/login");
+    if (!user || !supabase) {
+      localStorage.setItem("tutlab_return_to", "/become-a-tutor");
+      return nav("/auth/login");
+    }
     setStatus("submitting"); setError("");
     try {
       const applicationId = crypto.randomUUID();
@@ -968,6 +977,7 @@ function BecomeTutor({ nav, user }) {
     ["Teaching profile", "Show students how you teach and when you are available."],
     ["Verification", "Provide identity evidence and complete the declarations."],
   ];
+  if (!user) return <section className="tutor-apply-gate"><div className="gate-copy"><span className="overline">TUTOR APPLICATION</span><h1>Your application needs a verified account.</h1><p>Continue with Google first so your application, private documents, and review decision stay connected to you securely.</p><div className="gate-points"><span><ShieldCheck/>One account for your application status</span><span><BookOpen/>Private academic and identity evidence</span><span><Check/>Return here automatically after sign-in</span></div></div><div className="gate-card"><GoogleIcon/><h2>Continue securely</h2><p>You will return directly to the tutor application after choosing your Google account.</p><button className="dark-btn wide" onClick={() => { localStorage.setItem("tutlab_return_to", "/become-a-tutor"); nav("/auth/login"); }}>Continue with Google <ArrowRight/></button><small>Google shares your name and email. Your password is never shared with Tut Lab.</small></div></section>;
   if (status === "done") return <section className="application-success"><span><Check /></span><div className="overline">APPLICATION RECEIVED</div><h1>Your review has started.</h1><p>Your documents are stored privately. A reviewer will check identity, academic evidence, course expertise, teaching quality, and professional conduct before any tutor profile is published.</p><div className="review-timeline">{["Submitted", "Identity review", "Academic review", "Teaching assessment", "Decision"].map((item, index) => <div className={index === 0 ? "current" : ""} key={item}><b>{index + 1}</b><span>{item}</span></div>)}</div><button className="dark-btn" onClick={() => nav("/")}>Return home</button></section>;
   return <section className="page tutor-apply-page">
     <aside className="application-guide"><button className="back" onClick={() => nav("/")}>← Back home</button><span className="overline">TUTOR APPLICATION</span><h1>Teach with credibility.</h1><p>Every application is reviewed before a profile can go live. Submission does not guarantee approval.</p><div className="evaluation-list">{[[ShieldCheck, "Identity and age", "A clear government-issued photo ID."], [BookOpen, "Academic evidence", "A transcript or qualification supporting the course."], [Star, "Teaching assessment", "Accuracy, clarity, structure, and student focus."], [Users, "Professional conduct", "Agreement to safety and platform standards."]].map(([Icon, title, text]) => <div key={title}><Icon/><span><b>{title}</b><small>{text}</small></span></div>)}</div></aside>
