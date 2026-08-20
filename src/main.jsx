@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 import "./styles.css";
-import { supabase } from "./supabase";
+import { oauthProviderEnabled, supabase } from "./supabase";
 const API = "/api";
 function readStoredUser() {
   try {
@@ -952,8 +952,14 @@ function AuthPage({ kind, onAuth }) {
     if (!supabase)
       return setError("Add your Supabase URL and publishable key to .env first.");
     setLoading(true);
+    const providerKey = provider === "Google" ? "google" : "linkedin_oidc";
+    if (!(await oauthProviderEnabled(providerKey))) {
+      setError(`${provider} sign-in is not enabled in Supabase yet.`);
+      setLoading(false);
+      return;
+    }
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: provider === "Google" ? "google" : "linkedin_oidc",
+      provider: providerKey,
       options: {
         redirectTo: `${location.origin}/`,
         queryParams:
