@@ -112,26 +112,14 @@ function GoogleIcon() {
   );
 }
 
-function LinkedInIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#0A66C2" d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.34V8.98h3.42v1.57h.05c.47-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.29ZM5.32 7.41a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12ZM7.1 20.45H3.54V8.98H7.1v11.47Z" />
-    </svg>
-  );
-}
-
 function SocialAuth({ onSelect }) {
   return (
     <div className="social-auth">
       <div className="social-auth-grid">
         <button type="button" onClick={() => onSelect("Google")}>
-          <GoogleIcon /> <span>Google</span>
-        </button>
-        <button type="button" onClick={() => onSelect("LinkedIn")}>
-          <LinkedInIcon /> <span>LinkedIn</span>
+          <GoogleIcon /> <span>Continue with Google</span>
         </button>
       </div>
-      <div className="auth-divider"><span>or continue with email</span></div>
     </div>
   );
 }
@@ -1014,12 +1002,7 @@ function AuthPage({ kind, onAuth }) {
       setLoading(false);
     }
   };
-  const title =
-    mode === "login"
-      ? "Welcome back"
-      : mode === "signup"
-        ? "Create your account"
-        : "Reset your password";
+  const title = mode === "forgot" ? "Account recovery" : "Continue to Tut Lab";
   return (
     <main className={`auth-shell auth-${mode}`}>
       <section className="auth-visual">
@@ -1082,6 +1065,7 @@ function AuthPage({ kind, onAuth }) {
             )}
           </p>
           {mode !== "forgot" && <SocialAuth onSelect={socialAuth} />}
+          {mode !== "forgot" && error && <div className="form-alert error social-error">{error}</div>}
           <form onSubmit={submit}>
             {mode === "signup" && (
               <div className="two-col">

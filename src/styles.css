@@ -52,3 +52,6 @@
 @media(max-width:420px){.social-auth-grid{grid-template-columns:1fr}.social-auth-grid button{height:45px}.auth-divider{margin-top:15px}}
 
 .app-error{min-height:100vh;display:grid;place-items:center;align-content:center;text-align:center;padding:28px;background:radial-gradient(circle at 50% 25%,#f1d98255,transparent 30%),#f7f7f4}.app-error .brand{margin-bottom:55px}.app-error h1{font:800 clamp(34px,5vw,54px)/1.08 'Manrope';letter-spacing:-2px;margin:14px 0}.app-error p{color:var(--muted);margin:0 0 24px;max-width:480px;line-height:1.6}
+
+/* Google-only authentication */
+.auth-login .auth-form>p,.auth-signup .auth-form>p,.auth-login .auth-form>form,.auth-signup .auth-form>form,.auth-login .auth-terms,.auth-signup .auth-terms{display:none}.auth-login .social-auth,.auth-signup .social-auth{margin-top:30px}.auth-login .social-auth-grid,.auth-signup .social-auth-grid{grid-template-columns:1fr}.auth-login .social-auth-grid button,.auth-signup .social-auth-grid button{height:54px;font-size:14px}.social-error{margin-top:14px}
