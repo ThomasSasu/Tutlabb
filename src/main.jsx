@@ -41,7 +41,10 @@ async function api(path, options = {}) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
-  const data = await res.json().catch(() => ({}));
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json"))
+    throw new Error("The Tut Lab API is not available at this address.");
+  const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Something went wrong");
   return data;
 }
@@ -140,7 +143,9 @@ function App() {
   const [user, setUser] = useState(readStoredUser);
   useEffect(() => {
     api("/tutors")
-      .then(setMarketTutors)
+      .then((items) => {
+        if (Array.isArray(items)) setMarketTutors(items);
+      })
       .catch(() => {});
     const h = () => {
       setPage(getRoute());
