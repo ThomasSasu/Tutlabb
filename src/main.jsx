@@ -22,6 +22,16 @@ import {
 import "./styles.css";
 import { supabase } from "./supabase";
 const API = "/api";
+function readStoredUser() {
+  try {
+    const value = localStorage.getItem("tutlab_user");
+    return value ? JSON.parse(value) : null;
+  } catch {
+    localStorage.removeItem("tutlab_user");
+    localStorage.removeItem("tutlab_token");
+    return null;
+  }
+}
 async function api(path, options = {}) {
   const token = localStorage.getItem("tutlab_token");
   const res = await fetch(API + path, {
@@ -127,9 +137,7 @@ function App() {
   const [page, setPage] = useState(getRoute());
   const [menu, setMenu] = useState(false);
   const [marketTutors, setMarketTutors] = useState(tutors);
-  const [user, setUser] = useState(() =>
-    JSON.parse(localStorage.getItem("tutlab_user") || "null"),
-  );
+  const [user, setUser] = useState(readStoredUser);
   useEffect(() => {
     api("/tutors")
       .then(setMarketTutors)
@@ -1490,4 +1498,37 @@ function RequestTutor({ nav }) {
     </section>
   );
 }
-createRoot(document.getElementById("root")).render(<App />);
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error("Tut Lab render error", error, info);
+  }
+  reset = () => {
+    localStorage.removeItem("tutlab_user");
+    localStorage.removeItem("tutlab_token");
+    localStorage.removeItem("tutlab_refresh_token");
+    location.assign("/");
+  };
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <main className="app-error">
+        <Logo />
+        <span className="overline">LET'S TRY THAT AGAIN</span>
+        <h1>Tut Lab needs a quick refresh.</h1>
+        <p>Your saved sign-in session may be outdated. Clear it and reload safely.</p>
+        <button className="dark-btn" onClick={this.reset}>Clear session and reload</button>
+      </main>
+    );
+  }
+}
+
+createRoot(document.getElementById("root")).render(
+  <AppErrorBoundary><App /></AppErrorBoundary>,
+);
