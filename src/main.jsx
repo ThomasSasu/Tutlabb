@@ -139,8 +139,9 @@ function SocialAuth({ onSelect }) {
 }
 function App() {
   const getRoute = () => {
-    if (location.pathname.replace(/\/+$/, "") === "/payment/callback")
-      return `/payment/callback${location.search}`;
+    const callbackPath = location.pathname.replace(/\/+$/, "");
+    if (["/payment/callback", "/resource-payment/callback"].includes(callbackPath))
+      return `${callbackPath}${location.search}`;
     return location.hash.slice(1) || "/";
   };
   const [page, setPage] = useState(getRoute());
@@ -231,6 +232,12 @@ function App() {
           <RequestTutor nav={nav} />
         ) : pagePath === "/payment/callback" ? (
           <PaymentCallback nav={nav} user={user} route={page} />
+        ) : pagePath === "/resource-payment/callback" ? (
+          <ResourcePaymentCallback nav={nav} user={user} route={page} />
+        ) : pagePath.startsWith("/past-questions/") ? (
+          <PaidResourceViewer nav={nav} user={user} resourceId={pagePath.split("/")[2]} />
+        ) : pagePath === "/past-questions" ? (
+          <PastQuestionsPage nav={nav} user={user} />
         ) : pagePath.startsWith("/tutors/") ? (
           <TutorProfile
             tutor={
@@ -267,6 +274,7 @@ function Header({ page, nav, menu, setMenu, user, logout }) {
             ["/tutors", "Find a tutor"],
             ["/request-tutor", "Post a request"],
             ["/learn", "Learn"],
+            ["/past-questions", "Past questions"],
             ["/become-a-tutor", "Become a tutor"],
           ].map(([p, l]) => (
             <button
@@ -978,6 +986,168 @@ function LearnPage({ nav }) {
     </section>
   );
 }
+function videoEmbedUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") return `https://www.youtube-nocookie.com/embed/${url.pathname.split("/")[1]}`;
+    if (["youtube.com", "m.youtube.com"].includes(host)) {
+      const id = url.searchParams.get("v") || url.pathname.match(/\/(?:shorts|embed)\/([^/?]+)/)?.[1];
+      return id ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+    }
+    if (host === "vimeo.com") {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      return id ? `https://player.vimeo.com/video/${id}` : null;
+    }
+  } catch {}
+  return null;
+}
+function PastQuestionsPage({ nav, user }) {
+  const emptyForm = { title: "", course: "", institution: "", examYear: "", description: "", price: "5", videoUrl: "", rightsConfirmed: false };
+  const [items, setItems] = useState([]);
+  const [approvedTutor, setApprovedTutor] = useState(null);
+  const [query, setQuery] = useState("");
+  const [showSubmit, setShowSubmit] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [questionFile, setQuestionFile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [payingId, setPayingId] = useState("");
+  const load = () => {
+    setLoading(true);
+    functionApi("paid-resources")
+      .then((data) => setItems(data.items || []))
+      .catch((loadError) => setError(loadError.message))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, [user]);
+  useEffect(() => {
+    if (!user || !supabase) return setApprovedTutor(null);
+    supabase.from("tutors").select("id,name").eq("user_id", user.id).eq("published", true).maybeSingle().then(({ data }) => setApprovedTutor(data || null));
+  }, [user]);
+  const change = (event) => {
+    const { name, value, type, checked } = event.target;
+    setForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+  };
+  const publish = async (event) => {
+    event.preventDefault();
+    setError("");
+    if (!approvedTutor) return setError("Only approved tutors can publish paid past questions.");
+    if (!questionFile) return setError("Choose the past-question PDF or image.");
+    if (questionFile.size > 10 * 1024 * 1024) return setError("The question file must be 10 MB or smaller.");
+    setStatus("publishing");
+    const safeName = questionFile.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const objectPath = `${user.id}/${Date.now()}-${safeName}`;
+    try {
+      const { error: uploadError } = await supabase.storage.from("past-questions").upload(objectPath, questionFile, { contentType: questionFile.type, upsert: false });
+      if (uploadError) throw uploadError;
+      try {
+        await functionApi("paid-resource-submit", { method: "POST", body: JSON.stringify({ ...form, questionPath: objectPath, price: Number(form.price) }) });
+      } catch (submitError) {
+        await supabase.storage.from("past-questions").remove([objectPath]);
+        throw submitError;
+      }
+      setForm(emptyForm);
+      setQuestionFile(null);
+      setStatus("published");
+      setShowSubmit(false);
+      load();
+    } catch (publishError) {
+      setError(publishError.message);
+      setStatus("");
+    }
+  };
+  const openResource = async (item) => {
+    if (!user) {
+      localStorage.setItem("tutlab_return_to", "/past-questions");
+      nav("/auth/login");
+      return;
+    }
+    if (item.purchased || item.tutor_id === approvedTutor?.id) {
+      nav(`/past-questions/${item.id}`);
+      return;
+    }
+    setPayingId(item.id);
+    setError("");
+    try {
+      const checkout = await functionApi("paystack-resource-initialize", { method: "POST", body: JSON.stringify({ resourceId: item.id }) });
+      if (checkout.alreadyPurchased) return nav(`/past-questions/${item.id}`);
+      if (!checkout.authorizationUrl?.startsWith("https://checkout.paystack.com/")) throw new Error("Paystack returned an invalid checkout address.");
+      window.location.assign(checkout.authorizationUrl);
+    } catch (purchaseError) {
+      setError(purchaseError.message);
+      setPayingId("");
+    }
+  };
+  const visible = items.filter((item) => `${item.title} ${item.course} ${item.institution || ""} ${item.exam_year || ""}`.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <section className="paid-library page">
+      <div className="paid-library-hero">
+        <div><span className="overline">PAST QUESTIONS + VIDEO SOLUTIONS</span><h1>Practise the question.<br/>Understand the solution.</h1><p>Affordable past questions from approved tutors, paired with clear video walkthroughs.</p></div>
+        <div className="paid-library-actions">
+          {approvedTutor ? <button className="gold-btn" onClick={() => setShowSubmit(!showSubmit)}>{showSubmit ? "Close submission" : "Publish a resource"}</button> : <button className="outline-btn" onClick={() => nav(user ? "/become-a-tutor" : "/auth/login")}>{user ? "Become an approved tutor" : "Tutor sign in"}</button>}
+        </div>
+      </div>
+      {showSubmit && approvedTutor && <form className="paid-resource-form" onSubmit={publish}>
+        <div className="form-heading"><span>Publish a paid past question</span><small>Approved tutor: {approvedTutor.name}</small></div>
+        <div className="two-col"><label>Resource title<input required name="title" value={form.title} onChange={change} placeholder="2024 Calculus II worked paper"/></label><label>Course<input required name="course" value={form.course} onChange={change} placeholder="MATH 201 — Calculus II"/></label></div>
+        <div className="two-col"><label>University or examining body<input name="institution" value={form.institution} onChange={change} placeholder="University of Ghana"/></label><label>Exam year<input name="examYear" value={form.examYear} onChange={change} placeholder="2024"/></label></div>
+        <label>Description<textarea required minLength="40" name="description" value={form.description} onChange={change} placeholder="Describe the topics covered and what your explanation teaches."/></label>
+        <div className="two-col"><label>Explanation video link<input required type="url" name="videoUrl" value={form.videoUrl} onChange={change} placeholder="https://youtube.com/watch?v=..."/></label><label>Viewer price (GHS)<input required type="number" min="1" max="500" step="0.01" name="price" value={form.price} onChange={change}/></label></div>
+        <label className="paid-file">Past-question file <small>PDF, JPG, or PNG · maximum 10 MB</small><input required type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(event) => setQuestionFile(event.target.files[0] || null)}/><span>{questionFile?.name || "Choose question file"}</span></label>
+        <label className="rights-check"><input type="checkbox" name="rightsConfirmed" checked={form.rightsConfirmed} onChange={change}/><span>I confirm that I am permitted to share this material, it is not a confidential current assessment, and my explanation is my own work.</span></label>
+        {error && <div className="form-alert error">{error}</div>}
+        <button className="dark-btn" disabled={status === "publishing"}>{status === "publishing" ? "Publishing…" : "Publish resource"}<ArrowRight/></button>
+      </form>}
+      <div className="paid-library-search"><Search/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search course, university, title, or year"/><span>{visible.length} resources</span></div>
+      {!showSubmit && error && <div className="form-alert error library-alert">{error}</div>}
+      {status === "published" && <div className="form-alert success library-alert">Your past question and explanation are now published.</div>}
+      {loading ? <div className="paid-library-empty">Loading resources…</div> : !visible.length ? <div className="paid-library-empty"><BookOpen/><h2>No paid past questions yet</h2><p>Approved tutors can publish the first question and walkthrough.</p></div> : <div className="paid-resource-grid">{visible.map((item) => {
+        const owned = item.purchased || item.tutor_id === approvedTutor?.id;
+        return <article className="paid-resource-card" key={item.id}><div className="paid-resource-cover"><BookOpen/><span>{item.exam_year || "Past question"}</span><Play fill="currentColor"/></div><div className="paid-resource-copy"><small>{item.course}</small><h2>{item.title}</h2><p>{item.description}</p><div className="resource-author"><span>{item.tutor?.name || "Approved tutor"}<small>{item.institution || item.tutor?.school || "Tut Lab"}</small></span><ShieldCheck/></div><div className="resource-price"><strong>{owned ? "Purchased" : `${item.currency} ${Number(item.price).toFixed(2)}`}</strong><button disabled={payingId === item.id} onClick={() => openResource(item)}>{payingId === item.id ? "Opening Paystack…" : owned ? "Watch now" : "Pay and watch"}<ArrowRight/></button></div></div></article>;
+      })}</div>}
+    </section>
+  );
+}
+function PaidResourceViewer({ nav, user, resourceId }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!user) {
+      localStorage.setItem("tutlab_return_to", `/past-questions/${resourceId}`);
+      nav("/auth/login");
+      return;
+    }
+    functionApi(`paid-resource-access?id=${encodeURIComponent(resourceId)}`).then(setData).catch((accessError) => setError(accessError.message));
+  }, [user, resourceId]);
+  if (error) return <section className="resource-viewer-state"><ShieldCheck/><h1>Resource locked</h1><p>{error}</p><button className="dark-btn" onClick={() => nav("/past-questions")}>Browse past questions</button></section>;
+  if (!data) return <section className="resource-viewer-state"><Play/><h1>Preparing your lesson…</h1><p>Creating private access to the question and explanation.</p></section>;
+  const embed = videoEmbedUrl(data.videoUrl);
+  return <section className="paid-viewer"><button className="back" onClick={() => nav("/past-questions")}>← Back to past questions</button><div className="paid-viewer-heading"><div><span className="overline">PAID VIDEO EXPLANATION</span><h1>{data.resource.title}</h1><p>{data.resource.course} · {data.resource.institution || data.resource.tutor?.school || "Tut Lab"}</p></div><a className="outline-btn" href={data.questionUrl} target="_blank" rel="noreferrer">Open past question <BookOpen/></a></div><div className="paid-video-frame">{embed ? <iframe src={embed} title={data.resource.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen/> : <div><Play/><h2>Your explanation video is ready</h2><a className="gold-btn" href={data.videoUrl} target="_blank" rel="noreferrer">Open explanation video</a></div>}</div><div className="paid-viewer-notes"><h2>About this walkthrough</h2><p>{data.resource.description}</p><span><ShieldCheck/>Published by approved tutor {data.resource.tutor?.name || "Tut Lab tutor"}</span><small>Your past-question file link expires after one hour. Return to this page to create a new private link.</small></div></section>;
+}
+function ResourcePaymentCallback({ nav, user, route }) {
+  const params = new URLSearchParams(route.split("?")[1] || "");
+  const reference = params.get("reference") || params.get("trxref") || "";
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(true);
+  const verify = async () => {
+    setChecking(true); setError("");
+    try { setResult(await functionApi(`paystack-resource-verify?reference=${encodeURIComponent(reference)}`)); }
+    catch (verifyError) { setError(verifyError.message); }
+    finally { setChecking(false); }
+  };
+  useEffect(() => {
+    if (!reference) { setError("The payment reference is missing."); setChecking(false); return; }
+    if (!user) {
+      if (location.pathname.replace(/\/+$/, "") === "/resource-payment/callback") history.replaceState(null, "", `/#${route}`);
+      localStorage.setItem("tutlab_return_to", route); nav("/auth/login"); return;
+    }
+    verify();
+  }, [reference, user]);
+  return <section className="payment-result"><div className={`payment-result-icon ${result?.paid ? "paid" : ""}`}>{result?.paid ? <Check/> : <Play/>}</div>{checking ? <><span className="overline">VERIFYING PURCHASE</span><h1>Unlocking your video…</h1><p>Tut Lab is checking the payment directly with Paystack.</p></> : result?.paid ? <><span className="overline">RESOURCE UNLOCKED</span><h1>Your explanation is ready.</h1><p>Payment was verified. You can now watch the walkthrough and open the past question.</p><button className="dark-btn" onClick={() => window.location.assign(`/#/past-questions/${result.resourceId}`)}>Watch now <Play/></button></> : <><span className="overline">PAYMENT PROCESSING</span><h1>Access is not confirmed yet.</h1><p>{error || "Complete the payment prompt, then check again."}</p><div className="payment-result-actions"><button className="dark-btn" disabled={!reference} onClick={verify}>Check again</button><button className="outline-btn" onClick={() => window.location.assign("/#/past-questions")}>Back to library</button></div></>}</section>;
+}
 function LegacyBecomeTutor({ nav }) {
   return (
     <section className="page apply-page">
@@ -1431,6 +1601,7 @@ function Footer({ nav }) {
         <b>Explore</b>
         <button onClick={() => nav("/tutors")}>Find a tutor</button>
         <button onClick={() => nav("/learn")}>Free lessons</button>
+        <button onClick={() => nav("/past-questions")}>Past questions</button>
       </div>
       <div>
         <b>Tutors</b>

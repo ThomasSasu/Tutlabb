@@ -34,6 +34,28 @@ export default async (request) => {
   const db = createClient(supabaseUrl, supabaseSecret, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+  if (transaction.metadata?.purchase_type === "past_question") {
+    const { data: purchase } = await db
+      .from("resource_purchases")
+      .select("id,amount_subunit,currency,payment_reference,payment_status")
+      .eq("payment_reference", reference)
+      .maybeSingle();
+    if (!purchase) return response({ received: true });
+    const validPurchase =
+      transaction.status === "success" &&
+      transaction.reference === purchase.payment_reference &&
+      Number(transaction.amount) === Number(purchase.amount_subunit) &&
+      String(transaction.currency || "").toUpperCase() === String(purchase.currency || "GHS").toUpperCase() &&
+      (!transaction.metadata?.purchase_id || transaction.metadata.purchase_id === purchase.id);
+    if (!validPurchase) return response({ received: true });
+    const paidAt = transaction.paid_at || new Date().toISOString();
+    const { error } = await db
+      .from("resource_purchases")
+      .update({ payment_status: "paid", paystack_status: "success", payment_channel: transaction.channel || null, gateway_response: transaction.gateway_response || null, paid_at: paidAt, updated_at: new Date().toISOString() })
+      .eq("id", purchase.id);
+    if (error && error.code !== "23505") return response({ error: "Resource purchase update failed." }, 500);
+    return response({ received: true });
+  }
   const { data: booking } = await db
     .from("bookings")
     .select("id,amount_subunit,currency,payment_reference,payment_status")
