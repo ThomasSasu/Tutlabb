@@ -1,0 +1,17 @@
+[
+  {"id":"ug","name":"University of Ghana","country":"Ghana"},
+  {"id":"knust","name":"Kwame Nkrumah University of Science and Technology","country":"Ghana"},
+  {"id":"ashesi","name":"Ashesi University","country":"Ghana"},
+  {"id":"uct","name":"University of Cape Town","country":"South Africa"},
+  {"id":"unilag","name":"University of Lagos","country":"Nigeria"},
+  {"id":"oxford","name":"University of Oxford","country":"United Kingdom"},
+  {"id":"cambridge","name":"University of Cambridge","country":"United Kingdom"},
+  {"id":"mit","name":"Massachusetts Institute of Technology","country":"United States"},
+  {"id":"stanford","name":"Stanford University","country":"United States"},
+  {"id":"toronto","name":"University of Toronto","country":"Canada"},
+  {"id":"melbourne","name":"University of Melbourne","country":"Australia"},
+  {"id":"nus","name":"National University of Singapore","country":"Singapore"},
+  {"id":"tokyo","name":"University of Tokyo","country":"Japan"},
+  {"id":"eth-zurich","name":"ETH Zürich","country":"Switzerland"},
+  {"id":"sao-paulo","name":"University of São Paulo","country":"Brazil"}
+]

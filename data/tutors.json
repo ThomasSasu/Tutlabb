@@ -1,0 +1,5 @@
+[
+  {"id":"ama","name":"Ama Serwaa","course":"Calculus II","school":"University of Ghana","price":45,"image":"/assets/tutor1.jpg","modes":["online","in-person"],"mode":"Online & in person","availability":"available_today","available":"Available today","status":"profile_preview"},
+  {"id":"kwame","name":"Kwame Mensah","course":"Digital Signal Processing","school":"KNUST","price":50,"image":"/assets/tutor2.jpg","modes":["online"],"mode":"Online","availability":"scheduled","available":"View calendar","status":"profile_preview"},
+  {"id":"nana","name":"Nana Adjei","course":"Organic Chemistry","school":"University of Ghana","price":55,"image":"/assets/tutoring1.jpg","modes":["online","in-person"],"mode":"Online & in person","availability":"available_today","available":"Available today","status":"profile_preview"}
+]

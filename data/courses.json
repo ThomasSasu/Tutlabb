@@ -1,0 +1,66 @@
+[
+  {
+    "id": "math-calculus-1",
+    "code": "MATH 101",
+    "title": "Calculus I",
+    "field": "Mathematics",
+    "level": "100",
+    "resources": []
+  },
+  {
+    "id": "chem-organic",
+    "code": "CHEM 204",
+    "title": "Organic Chemistry",
+    "field": "Physical Sciences",
+    "level": "200",
+    "resources": []
+  },
+  {
+    "id": "cs-data-structures",
+    "code": "CS 214",
+    "title": "Data Structures",
+    "field": "Computer Science",
+    "level": "200",
+    "resources": []
+  },
+  {
+    "id": "law-contract",
+    "code": "LAW 206",
+    "title": "Contract Law",
+    "field": "Law",
+    "level": "200",
+    "resources": []
+  },
+  {
+    "id": "business-accounting",
+    "code": "ACCT 201",
+    "title": "Financial Accounting",
+    "field": "Business",
+    "level": "200",
+    "resources": []
+  },
+  {
+    "id": "medicine-anatomy",
+    "code": "MED 111",
+    "title": "Anatomy",
+    "field": "Medicine",
+    "level": "100",
+    "resources": []
+  },
+  {
+    "id": "arts-literature",
+    "code": "LIT 101",
+    "title": "English Literature",
+    "field": "Arts & Humanities",
+    "level": "100",
+    "resources": []
+  },
+  {
+    "id": "engineering-mechanics",
+    "code": "ENG 203",
+    "title": "Engineering Mechanics",
+    "field": "Engineering",
+    "level": "200",
+    "resources": []
+  }
+]
