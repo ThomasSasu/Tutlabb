@@ -109,6 +109,28 @@ app.post("/api/resources", requireUser, upload.single("file"), async (req, res) 
 app.patch("/api/resources/:id/approve", requireAdmin, async (req, res) => { const { data, error } = await supabase.from("resources").update({ status: "approved" }).eq("id", req.params.id).select().single(); return error ? fail(res, error, 404) : res.json(data); });
 app.post("/api/tutors/apply", requireUser, async (req, res) => { const { data, error } = await supabase.from("tutor_applications").insert({ user_id: req.user.id, application: req.body, gpa: req.body.gpa ? Number(req.body.gpa) : null, status: "submitted" }).select().single(); return error ? fail(res, error) : res.status(201).json(data); });
 app.patch("/api/tutors/:id/accept", requireAdmin, async (req, res) => { const { data, error } = await supabase.from("tutor_applications").update({ status: "accepted" }).eq("id", req.params.id).select().single(); return error ? fail(res, error, 404) : res.json(data); });
+app.patch("/api/tutor-applications/:id/review", requireAdmin, async (req, res) => {
+  const transitions = {
+    reviewing: "identity_review",
+    academic_review: "academic_review",
+    teaching_assessment: "teaching_assessment",
+    more_information: "information_requested",
+    approved: "complete",
+    declined: "complete",
+  };
+  const status = String(req.body.status || "");
+  if (!transitions[status]) return res.status(422).json({ error: "Choose a valid application decision or review stage." });
+  if (["declined", "more_information"].includes(status) && !String(req.body.reason || "").trim()) return res.status(422).json({ error: "A clear reason is required for this decision." });
+  const { data, error } = await supabase.from("tutor_applications").update({
+    status,
+    review_stage: transitions[status],
+    reviewer_id: req.user.id,
+    reviewer_notes: String(req.body.notes || "").trim() || null,
+    decision_reason: String(req.body.reason || "").trim() || null,
+    reviewed_at: ["approved", "declined"].includes(status) ? new Date().toISOString() : null,
+  }).eq("id", req.params.id).select().single();
+  return error ? fail(res, error, 404) : res.json(data);
+});
 app.post("/api/sessions", requireUser, async (req, res) => { if (!req.body.zoomLink?.startsWith("https://")) return res.status(422).json({ error: "A valid meeting link is required." }); const { data, error } = await supabase.from("sessions").insert({ owner_id: req.user.id, details: req.body, status: "published" }).select().single(); return error ? fail(res, error) : res.status(201).json(data); });
 app.get("/api/sessions", async (_, res) => { const { data, error } = await supabase.from("sessions").select("*").eq("status", "published"); return error ? fail(res, error) : res.json(data); });
 app.post("/api/bookings", requireUser, async (req, res) => { const price = Number(req.body.price || 0), people = Math.max(1, Number(req.body.people || 1)); const { data, error } = await supabase.from("bookings").insert({ user_id: req.user.id, details: req.body, price, people, payment_account: process.env.PAYMENT_ACCOUNT || "0204392306", tutor_payout: price * .8 * people, platform_share: price * .2 * people }).select().single(); return error ? fail(res, error) : res.status(201).json(data); });

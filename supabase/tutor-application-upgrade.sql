@@ -2,6 +2,11 @@
 -- Adds secure tutor-application submissions and private evidence storage.
 
 alter table public.tutor_applications alter column gpa drop not null;
+alter table public.tutor_applications add column if not exists review_stage text not null default 'initial_screening';
+alter table public.tutor_applications add column if not exists reviewer_id uuid references public.profiles(id) on delete set null;
+alter table public.tutor_applications add column if not exists reviewer_notes text;
+alter table public.tutor_applications add column if not exists decision_reason text;
+alter table public.tutor_applications add column if not exists reviewed_at timestamptz;
 
 drop policy if exists "submit own application" on public.tutor_applications;
 create policy "submit own application"
