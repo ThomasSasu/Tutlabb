@@ -21,6 +21,7 @@ create table if not exists public.catalog_requests (id uuid primary key default 
 create table if not exists public.tutor_requests (id uuid primary key default gen_random_uuid(), user_id uuid references public.profiles(id) on delete set null, subject text not null, university text, level text, location text, mode text not null, language text default 'English', budget numeric(10,2), details text not null, status text not null default 'open', created_at timestamptz not null default now());
 create table if not exists public.resources (id uuid primary key default gen_random_uuid(), uploader_id uuid references public.profiles(id) on delete set null, course_id text references public.courses(id) on delete set null, title text not null, type text, url text not null, original_name text, status text not null default 'pending', created_at timestamptz not null default now());
 create table if not exists public.tutor_applications (id uuid primary key default gen_random_uuid(), user_id uuid references public.profiles(id) on delete cascade, application jsonb not null default '{}', gpa numeric(3,2) not null, status text not null default 'pending', created_at timestamptz not null default now());
+alter table public.tutor_applications alter column gpa drop not null;
 create table if not exists public.sessions (id uuid primary key default gen_random_uuid(), owner_id uuid references public.profiles(id) on delete cascade, details jsonb not null default '{}', status text not null default 'draft', created_at timestamptz not null default now());
 create table if not exists public.bookings (id uuid primary key default gen_random_uuid(), user_id uuid references public.profiles(id) on delete cascade, details jsonb not null default '{}', price numeric(10,2) not null, people integer not null default 1, payment_account text, payment_status text not null default 'awaiting_verification', payment_reference text, payment_proof text, tutor_payout numeric(10,2), platform_share numeric(10,2), status text not null default 'pending', payout_status text, confirmed_at timestamptz, created_at timestamptz not null default now());
 create table if not exists public.login_notifications (id uuid primary key default gen_random_uuid(), user_id uuid references public.profiles(id) on delete cascade, event_key text not null unique, provider text, sent_at timestamptz, created_at timestamptz not null default now());
@@ -64,10 +65,17 @@ drop policy if exists "own tutor requests" on public.tutor_requests;
 create policy "own tutor requests" on public.tutor_requests for select using (auth.uid()=user_id);
 drop policy if exists "own applications" on public.tutor_applications;
 create policy "own applications" on public.tutor_applications for select using (auth.uid()=user_id);
+drop policy if exists "submit own application" on public.tutor_applications;
+create policy "submit own application" on public.tutor_applications for insert with check (auth.uid()=user_id and status='submitted');
 drop policy if exists "own bookings" on public.bookings;
 create policy "own bookings" on public.bookings for select using (auth.uid()=user_id);
 
 insert into storage.buckets (id,name,public,file_size_limit) values ('resources','resources',true,10485760) on conflict (id) do nothing;
+insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types) values ('tutor-verification','tutor-verification',false,10485760,array['application/pdf','image/jpeg','image/png']) on conflict (id) do update set public=false,file_size_limit=10485760,allowed_mime_types=excluded.allowed_mime_types;
+drop policy if exists "upload own tutor evidence" on storage.objects;
+create policy "upload own tutor evidence" on storage.objects for insert to authenticated with check (bucket_id='tutor-verification' and (storage.foldername(name))[1]=auth.uid()::text);
+drop policy if exists "read own tutor evidence" on storage.objects;
+create policy "read own tutor evidence" on storage.objects for select to authenticated using (bucket_id='tutor-verification' and (storage.foldername(name))[1]=auth.uid()::text);
 
 insert into public.courses(id,code,title,field,level) values
 ('math-calculus-1','MATH 101','Calculus I','Mathematics','100'),('chem-organic','CHEM 204','Organic Chemistry','Physical Sciences','200'),

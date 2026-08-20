@@ -218,7 +218,7 @@ function App() {
         ) : page === "/learn" ? (
           <LearnPage nav={nav} />
         ) : page === "/become-a-tutor" ? (
-          <BecomeTutor nav={nav} />
+          <BecomeTutor nav={nav} user={user} />
         ) : (
           <Home nav={nav} items={marketTutors} user={user} />
         )}
@@ -843,7 +843,7 @@ function LearnPage({ nav }) {
     </section>
   );
 }
-function BecomeTutor({ nav }) {
+function LegacyBecomeTutor({ nav }) {
   return (
     <section className="page apply-page">
       <div className="apply-copy">
@@ -919,6 +919,72 @@ function BecomeTutor({ nav }) {
     </section>
   );
 }
+function BecomeTutor({ nav, user }) {
+  const [step, setStep] = useState(0);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [files, setFiles] = useState({ identity: null, academic: null });
+  const [form, setForm] = useState({
+    fullName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() : "",
+    country: "", university: "", qualification: "", course: "", courseCode: "",
+    grade: "", experience: "", bio: "", modes: ["online"], rate: "",
+    availability: "", demoUrl: "", ageConfirmed: false, accuracyConfirmed: false,
+    conductConfirmed: false, documentConsent: false,
+  });
+  const change = (e) => setForm((current) => ({ ...current, [e.target.name]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+  const toggleMode = (mode) => setForm((current) => ({ ...current, modes: current.modes.includes(mode) ? current.modes.filter((item) => item !== mode) : [...current.modes, mode] }));
+  const validate = () => {
+    if (step === 0 && (!form.fullName || !form.country || !form.university || !form.qualification || !form.ageConfirmed)) return "Complete every eligibility field and confirm that you are at least 18.";
+    if (step === 1 && (!form.course || !form.grade || !files.academic)) return "Add the course, your result, and academic evidence.";
+    if (step === 2 && (form.bio.trim().length < 120 || !form.rate || !form.availability || !form.modes.length)) return "Add a 120-character teaching statement, rate, availability, and lesson mode.";
+    if (step === 3 && (!files.identity || !form.accuracyConfirmed || !form.conductConfirmed || !form.documentConsent)) return "Upload identity evidence and accept all declarations.";
+    return "";
+  };
+  const next = () => { const issue = validate(); if (issue) return setError(issue); setError(""); setStep((value) => Math.min(3, value + 1)); };
+  const submit = async () => {
+    const issue = validate(); if (issue) return setError(issue);
+    if (!user || !supabase) return nav("/auth/login");
+    setStatus("submitting"); setError("");
+    try {
+      const applicationId = crypto.randomUUID();
+      const paths = {};
+      for (const [kind, file] of Object.entries(files)) {
+        if (file.size > 10 * 1024 * 1024) throw new Error(`${kind} document must be smaller than 10 MB.`);
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+        const path = `${user.id}/${applicationId}/${kind}-${safeName}`;
+        const { error: uploadError } = await supabase.storage.from("tutor-verification").upload(path, file, { contentType: file.type });
+        if (uploadError) throw uploadError;
+        paths[`${kind}Path`] = path;
+      }
+      const application = { ...form, ...paths, email: user.email, submittedAt: new Date().toISOString(), reviewRubric: ["identity", "academic_evidence", "subject_expertise", "teaching_quality", "professional_conduct"] };
+      const { error: insertError } = await supabase.from("tutor_applications").insert({ id: applicationId, user_id: user.id, application, status: "submitted" });
+      if (insertError) throw insertError;
+      setStatus("done");
+    } catch (submissionError) { setError(submissionError.message); setStatus(""); }
+  };
+  const steps = [
+    ["Eligibility", "Tell us who you are and where you studied."],
+    ["Course evidence", "Apply only for courses your academic record supports."],
+    ["Teaching profile", "Show students how you teach and when you are available."],
+    ["Verification", "Provide identity evidence and complete the declarations."],
+  ];
+  if (status === "done") return <section className="application-success"><span><Check /></span><div className="overline">APPLICATION RECEIVED</div><h1>Your review has started.</h1><p>Your documents are stored privately. A reviewer will check identity, academic evidence, course expertise, teaching quality, and professional conduct before any tutor profile is published.</p><div className="review-timeline">{["Submitted", "Identity review", "Academic review", "Teaching assessment", "Decision"].map((item, index) => <div className={index === 0 ? "current" : ""} key={item}><b>{index + 1}</b><span>{item}</span></div>)}</div><button className="dark-btn" onClick={() => nav("/")}>Return home</button></section>;
+  return <section className="page tutor-apply-page">
+    <aside className="application-guide"><button className="back" onClick={() => nav("/")}>← Back home</button><span className="overline">TUTOR APPLICATION</span><h1>Teach with credibility.</h1><p>Every application is reviewed before a profile can go live. Submission does not guarantee approval.</p><div className="evaluation-list">{[[ShieldCheck, "Identity and age", "A clear government-issued photo ID."], [BookOpen, "Academic evidence", "A transcript or qualification supporting the course."], [Star, "Teaching assessment", "Accuracy, clarity, structure, and student focus."], [Users, "Professional conduct", "Agreement to safety and platform standards."]].map(([Icon, title, text]) => <div key={title}><Icon/><span><b>{title}</b><small>{text}</small></span></div>)}</div></aside>
+    <form className="application-form" onSubmit={(e) => e.preventDefault()}>
+      <div className="application-progress">{steps.map((item, index) => <React.Fragment key={item[0]}><button type="button" className={index === step ? "active" : index < step ? "complete" : ""} onClick={() => index < step && setStep(index)}>{index < step ? <Check/> : index + 1}</button>{index < steps.length - 1 && <i/>}</React.Fragment>)}</div>
+      <small>STEP {step + 1} OF {steps.length}</small><h2>{steps[step][0]}</h2><p>{steps[step][1]}</p>
+      {step === 0 && <><label>Legal name<input required name="fullName" value={form.fullName} onChange={change} placeholder="As shown on your ID"/></label><div className="two-col"><label>Country of residence<input required name="country" value={form.country} onChange={change}/></label><label>University or institution<input required name="university" value={form.university} onChange={change}/></label></div><label>Highest qualification or current programme<input required name="qualification" value={form.qualification} onChange={change} placeholder="e.g. BSc Computer Engineering, Year 3"/></label><label className="application-consent"><input type="checkbox" name="ageConfirmed" checked={form.ageConfirmed} onChange={change}/><span>I confirm that I am at least 18 years old.</span></label></>}
+      {step === 1 && <><div className="two-col"><label>Course you want to teach<input required name="course" value={form.course} onChange={change} placeholder="e.g. Calculus II"/></label><label>Course code<input name="courseCode" value={form.courseCode} onChange={change} placeholder="e.g. MATH 201"/></label></div><label>Your grade or result in this course<input required name="grade" value={form.grade} onChange={change} placeholder="Use the grading system on your transcript"/></label><label className="file-field">Academic evidence <small>Transcript, certificate, or official result · PDF/JPG/PNG · max 10 MB</small><input required type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFiles({...files, academic: e.target.files[0]})}/><span>{files.academic?.name || "Choose academic document"}</span></label><p className="review-note"><ShieldCheck/> A reviewer checks that the named institution, course, and result match your application.</p></>}
+      {step === 2 && <><label>Teaching statement <small>{form.bio.length}/600</small><textarea required maxLength="600" name="bio" value={form.bio} onChange={change} placeholder="Explain how you help students understand difficult concepts, structure lessons, and adapt your teaching."/></label><div className="two-col"><label>Teaching experience<select name="experience" value={form.experience} onChange={change}><option value="">Select</option><option>New tutor</option><option>Less than 1 year</option><option>1–3 years</option><option>3+ years</option></select></label><label>Proposed hourly rate<input required type="number" min="1" name="rate" value={form.rate} onChange={change}/></label></div><fieldset><legend>Lesson modes</legend><div className="application-modes">{["online", "in-person"].map((mode) => <button type="button" className={form.modes.includes(mode) ? "selected" : ""} onClick={() => toggleMode(mode)} key={mode}>{mode === "online" ? <Monitor/> : <MapPin/>}{mode}</button>)}</div></fieldset><label>Weekly availability<input required name="availability" value={form.availability} onChange={change} placeholder="e.g. Mon–Thu after 4 PM GMT"/></label><label>Teaching demonstration link <small>Recommended</small><input type="url" name="demoUrl" value={form.demoUrl} onChange={change} placeholder="Public or unlisted video link"/></label></>}
+      {step === 3 && <><label className="file-field">Government-issued photo ID <small>Passport, national ID, or driver's licence · PDF/JPG/PNG · max 10 MB</small><input required type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFiles({...files, identity: e.target.files[0]})}/><span>{files.identity?.name || "Choose identity document"}</span></label>{[["accuracyConfirmed", "The information and documents I provided are accurate and belong to me."], ["conductConfirmed", "I agree to professional conduct, academic integrity, and student-safety standards."], ["documentConsent", "I consent to Tut Lab using these documents only to evaluate and verify my application."]].map(([name, text]) => <label className="application-consent" key={name}><input type="checkbox" name={name} checked={form[name]} onChange={change}/><span>{text}</span></label>)}<div className="decision-note"><ShieldCheck/><span><b>What happens next</b><small>A reviewer may approve, request more information, invite you to a teaching assessment, or decline. Your profile remains unpublished until approval.</small></span></div></>}
+      {error && <div className="form-alert error">{error}</div>}
+      <div className="application-actions">{step > 0 && <button type="button" className="outline-btn" onClick={() => { setError(""); setStep(step - 1); }}>Back</button>}<button type="button" className="dark-btn" disabled={status === "submitting"} onClick={step === 3 ? submit : next}>{status === "submitting" ? "Submitting securely…" : step === 3 ? "Submit for review" : "Continue"}<ArrowRight/></button></div>
+      <small className="form-note">Documents are private and never displayed on your public profile.</small>
+    </form>
+  </section>;
+}
+
 function AuthPage({ kind, onAuth }) {
   const mode = ["signup", "forgot"].includes(kind) ? kind : "login";
   const [show, setShow] = useState(false);
