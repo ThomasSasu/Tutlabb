@@ -48,6 +48,20 @@ async function api(path, options = {}) {
   if (!res.ok) throw new Error(data.error || "Something went wrong");
   return data;
 }
+async function functionApi(name, options = {}) {
+  const token = localStorage.getItem("tutlab_token");
+  const res = await fetch(`/.netlify/functions/${name}`, {
+    ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "The secure payment service is unavailable.");
+  return data;
+}
 const tutors = [
   {
     id: "ama",
@@ -124,7 +138,11 @@ function SocialAuth({ onSelect }) {
   );
 }
 function App() {
-  const getRoute = () => location.hash.slice(1) || "/";
+  const getRoute = () => {
+    if (location.pathname.replace(/\/+$/, "") === "/payment/callback")
+      return `/payment/callback${location.search}`;
+    return location.hash.slice(1) || "/";
+  };
   const [page, setPage] = useState(getRoute());
   const [menu, setMenu] = useState(false);
   const [marketTutors, setMarketTutors] = useState(tutors);
@@ -185,10 +203,11 @@ function App() {
     setUser(null);
     nav("/");
   };
-  if (page.startsWith("/auth/"))
+  const pagePath = page.split("?")[0];
+  if (pagePath.startsWith("/auth/"))
     return (
       <AuthPage
-        kind={page.split("/")[2]}
+        kind={pagePath.split("/")[2]}
         onAuth={(u) => {
           setUser(u);
           const returnTo = localStorage.getItem("tutlab_return_to") || "/";
@@ -208,24 +227,26 @@ function App() {
         logout={logout}
       />
       <main>
-        {page === "/request-tutor" ? (
+        {pagePath === "/request-tutor" ? (
           <RequestTutor nav={nav} />
-        ) : page.startsWith("/tutors/") ? (
+        ) : pagePath === "/payment/callback" ? (
+          <PaymentCallback nav={nav} user={user} route={page} />
+        ) : pagePath.startsWith("/tutors/") ? (
           <TutorProfile
             tutor={
-              marketTutors.find((t) => t.id === page.split("/")[2]) ||
+              marketTutors.find((t) => t.id === pagePath.split("/")[2]) ||
               marketTutors[0]
             }
             nav={nav}
             user={user}
           />
-        ) : page.startsWith("/tutors") ? (
+        ) : pagePath.startsWith("/tutors") ? (
           <TutorsPage nav={nav} items={marketTutors} user={user} />
-        ) : page === "/learn" ? (
+        ) : pagePath === "/learn" ? (
           <LearnPage nav={nav} />
-        ) : page === "/become-a-tutor" ? (
+        ) : pagePath === "/become-a-tutor" ? (
           <BecomeTutor nav={nav} user={user} />
-        ) : page === "/admin/tutor-applications" ? (
+        ) : pagePath === "/admin/tutor-applications" ? (
           <TutorApplicationsAdmin nav={nav} user={user} />
         ) : (
           <Home nav={nav} items={marketTutors} user={user} />
@@ -685,12 +706,58 @@ function TutorsPage({ nav, items = tutors, user }) {
   );
 }
 function TutorProfile({ tutor, nav, user }) {
-  const [course, setCourse] = useState(tutor.course);
-  const [mode, setMode] = useState("online");
+  const tutorModes = Array.isArray(tutor.modes) && tutor.modes.length
+    ? tutor.modes
+    : ["online", ...(String(tutor.mode).toLowerCase().includes("person") ? ["in-person"] : [])];
+  const [mode, setMode] = useState(tutorModes.includes("online") ? "online" : "in-person");
   const [duration, setDuration] = useState(1);
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [paymentState, setPaymentState] = useState("");
+  const [paymentError, setPaymentError] = useState("");
   const total = Math.round(
-    tutor.price * duration * (mode === "person" ? 1.15 : 1),
-  );
+    tutor.price * duration * (mode === "in-person" ? 1.15 : 1) * 100,
+  ) / 100;
+  const today = (() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 10);
+  })();
+  const beginCheckout = async () => {
+    setPaymentError("");
+    if (!user) {
+      localStorage.setItem("tutlab_return_to", `/tutors/${tutor.id}`);
+      nav("/auth/login");
+      return;
+    }
+    if (!date || !time) {
+      setPaymentError("Choose your preferred lesson date and time.");
+      return;
+    }
+    const scheduledAt = new Date(`${date}T${time}:00`);
+    if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() < Date.now() + 15 * 60 * 1000) {
+      setPaymentError("Choose a lesson time at least 15 minutes from now.");
+      return;
+    }
+    setPaymentState("starting");
+    try {
+      const checkout = await functionApi("paystack-initialize", {
+        method: "POST",
+        body: JSON.stringify({
+          tutorId: tutor.id,
+          mode,
+          duration,
+          scheduledAt: scheduledAt.toISOString(),
+        }),
+      });
+      if (!checkout.authorizationUrl?.startsWith("https://checkout.paystack.com/"))
+        throw new Error("Paystack returned an invalid checkout address.");
+      window.location.assign(checkout.authorizationUrl);
+    } catch (error) {
+      setPaymentError(error.message);
+      setPaymentState("");
+    }
+  };
   return (
     <section className="page section">
       <button className="back" onClick={() => nav("/tutors")}>
@@ -739,12 +806,8 @@ function TutorProfile({ tutor, nav, user }) {
           <label>
             Course
             <div className="booking-select">
-              <select
-                value={course}
-                onChange={(e) => setCourse(e.target.value)}
-              >
+              <select value={tutor.course} disabled>
                 <option>{tutor.course}</option>
-                <option>Request another course</option>
               </select>
               <ChevronDown />
             </div>
@@ -755,14 +818,16 @@ function TutorProfile({ tutor, nav, user }) {
               <button
                 type="button"
                 className={mode === "online" ? "selected" : ""}
+                disabled={!tutorModes.includes("online")}
                 onClick={() => setMode("online")}
               >
                 <Monitor /> Online
               </button>
               <button
                 type="button"
-                className={mode === "person" ? "selected" : ""}
-                onClick={() => setMode("person")}
+                className={mode === "in-person" ? "selected" : ""}
+                disabled={!tutorModes.includes("in-person")}
+                onClick={() => setMode("in-person")}
               >
                 <MapPin /> In person
               </button>
@@ -783,22 +848,84 @@ function TutorProfile({ tutor, nav, user }) {
               <ChevronDown />
             </div>
           </label>
+          <div className="booking-datetime">
+            <label>
+              Lesson date
+              <input type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+            <label>
+              Start time
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </label>
+          </div>
           <div className="booking-total">
             <span>Estimated session total</span>
-            <strong>GHS {total}</strong>
+            <strong>GHS {total.toFixed(2)}</strong>
           </div>
+          {mode === "in-person" && <div className="booking-adjustment">Includes 15% in-person coordination</div>}
+          {paymentError && <div className="form-alert error booking-error">{paymentError}</div>}
           <button
             className="gold-btn wide"
-            onClick={() => (user ? nav("/request-tutor") : nav("/auth/login"))}
+            disabled={paymentState === "starting"}
+            onClick={beginCheckout}
           >
-            Choose a time <ArrowRight />
+            {paymentState === "starting" ? "Opening secure checkout…" : "Continue to secure payment"} <ArrowRight />
           </button>
           <small>
-            <ShieldCheck /> Final availability and total are confirmed at
-            checkout
+            <ShieldCheck /> Payment is processed securely by Paystack
           </small>
         </aside>
       </div>
+    </section>
+  );
+}
+function PaymentCallback({ nav, user, route }) {
+  const params = new URLSearchParams(route.split("?")[1] || "");
+  const reference = params.get("reference") || params.get("trxref") || "";
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(true);
+  const verify = async () => {
+    setChecking(true);
+    setError("");
+    try {
+      const data = await functionApi(`paystack-verify?reference=${encodeURIComponent(reference)}`);
+      setResult(data);
+    } catch (verifyError) {
+      setError(verifyError.message);
+    } finally {
+      setChecking(false);
+    }
+  };
+  useEffect(() => {
+    if (!reference) {
+      setError("The payment reference is missing. No booking was confirmed.");
+      setChecking(false);
+      return;
+    }
+    if (!user) {
+      if (location.pathname.replace(/\/+$/, "") === "/payment/callback")
+        history.replaceState(null, "", `/#${route}`);
+      localStorage.setItem("tutlab_return_to", route);
+      nav("/auth/login");
+      return;
+    }
+    verify();
+  }, [reference, user]);
+  const booking = result?.booking;
+  const details = booking?.details || {};
+  return (
+    <section className="payment-result">
+      <div className={`payment-result-icon ${result?.paid ? "paid" : ""}`}>
+        {result?.paid ? <Check /> : <ShieldCheck />}
+      </div>
+      {checking ? (
+        <><span className="overline">VERIFYING PAYMENT</span><h1>Confirming your booking…</h1><p>Keep this page open while Tut Lab checks the transaction directly with Paystack.</p></>
+      ) : result?.paid ? (
+        <><span className="overline">PAYMENT CONFIRMED</span><h1>Your lesson is booked.</h1><p>Your payment was verified securely. The tutor booking is now confirmed.</p><div className="payment-receipt"><span><b>Tutor</b>{details.tutorName}</span><span><b>Course</b>{details.course}</span><span><b>Lesson</b>{details.duration} hour{details.duration === 1 ? "" : "s"} · {details.mode}</span><span><b>Total paid</b>{booking.currency} {Number(booking.price).toFixed(2)}</span></div><button className="dark-btn" onClick={() => window.location.assign("/#/")}>Return home <ArrowRight /></button></>
+      ) : (
+        <><span className="overline">PAYMENT PROCESSING</span><h1>We have not confirmed the payment yet.</h1><p>{error || "Mobile Money approval can take a moment. Complete the prompt on your phone, then check again."}</p><div className="payment-result-actions"><button className="dark-btn" disabled={!reference} onClick={verify}>Check payment again</button><button className="outline-btn" onClick={() => window.location.assign("/#/tutors")}>Back to tutors</button></div></>
+      )}
     </section>
   );
 }
