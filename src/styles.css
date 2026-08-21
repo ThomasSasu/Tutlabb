@@ -90,7 +90,7 @@ footer{max-width:none;margin:0;padding:65px max(28px,calc((100% - 1140px)/2)) 48
 .hero-badge,.hero-slot{z-index:4}
 
 /* Responsive hardening: keep every route fluid from small phones to wide screens. */
-html,body,#root{width:100%;max-width:100%;overflow-x:clip}
+html,body,#root{width:100%;max-width:100%;overflow-x:hidden}
 body{min-width:0}
 main,main>section,header,footer{max-width:100%}
 img,svg,video,iframe,canvas{max-width:100%}
@@ -99,13 +99,15 @@ input,select,textarea,button{min-width:0;max-width:100%}
 h1,h2,h3,h4,p,small,span,a,button,label{overflow-wrap:anywhere}
 .hero>*,.learn-feature>*,.profile-layout>*,.apply-page>*,.request-page>*,.tutor-apply-page>*,.tutor-apply-gate>*,.paid-library-hero>*,.paid-viewer-heading>*,.auth-shell>*,.section-title>*,.cta>*{min-width:0}
 .search-input,.search-input input,.filterbar,.filterbar>*,.two-col>*,.resource-author>*,.resource-price>*,.form-heading>*,.admin-heading>*,.applicant-head>*,.paid-viewer-heading>*{min-width:0}
+.eyebrow,.overline{width:fit-content;max-width:100%;white-space:normal}
+.section,.admin-applications,.paid-viewer{width:100%}
 .dark-btn,.gold-btn,.outline-btn,.mobile-toggle,.nav-wrap button{min-height:44px}
 
 @media(min-width:1600px){
-  .nav-wrap,.hero{max-width:1360px}
-  .section{max-width:1320px}
-  .section.soft{padding-inline:max(40px,calc((100% - 1264px)/2))}
-  .hero{grid-template-columns:1.08fr .92fr;padding-inline:72px}
+  .nav-wrap,.hero{max-width:1440px}
+  .section{max-width:1380px}
+  .section.soft{padding-inline:max(48px,calc((100% - 1320px)/2))}
+  .hero{grid-template-columns:1.08fr .92fr;padding-inline:76px}
 }
 
 @media(max-width:1180px){
@@ -115,9 +117,10 @@ h1,h2,h3,h4,p,small,span,a,button,label{overflow-wrap:anywhere}
   .nav-wrap nav.open button{height:auto;min-height:46px;padding:13px;text-align:left}
   .nav-wrap nav.open .mobile-auth{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px;border-top:1px solid var(--line);margin-top:8px;padding-top:12px}
   .nav-wrap nav.open .mobile-auth>button{width:100%;text-align:center}
-  .hero{grid-template-columns:minmax(0,1fr);min-height:0;padding:58px 42px}
-  .hero-copy{max-width:760px}
-  .hero-visual{width:100%;height:min(62vw,560px);min-height:430px}
+  .hero{grid-template-columns:minmax(0,1.04fr) minmax(0,.96fr);min-height:min(620px,calc(100svh - 112px));padding:48px 36px;gap:38px}
+  .hero h1{font-size:clamp(48px,5.3vw,64px);letter-spacing:-3.8px}
+  .hero-visual{width:100%;height:clamp(390px,55vw,500px);min-height:0}
+  .course-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .profile-layout{grid-template-columns:minmax(0,1fr) minmax(280px,330px);gap:28px}
 }
 
@@ -135,6 +138,16 @@ h1,h2,h3,h4,p,small,span,a,button,label{overflow-wrap:anywhere}
   .auth-panel{min-height:100svh;padding:36px 24px}
 }
 
+@media(max-width:900px){
+  .hero{grid-template-columns:minmax(0,1fr);min-height:0;padding:50px clamp(24px,5vw,42px);gap:42px}
+  .hero-copy{max-width:760px}
+  .hero-visual{height:min(62vw,500px);min-height:380px}
+  .learn-feature{grid-template-columns:minmax(0,1fr)}
+  .tutor-grid,.resource-grid,.paid-resource-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .trust-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}
+  .trust-strip b{white-space:normal}
+}
+
 @media(max-width:760px){
   .hero,.section,.apply-page,.paid-viewer{padding-inline:20px}
   .hero{padding-block:44px}
@@ -143,7 +156,10 @@ h1,h2,h3,h4,p,small,span,a,button,label{overflow-wrap:anywhere}
   .trust-strip{max-width:calc(100% - 24px)}
   .section-title,.results-head,.profile-head,.form-heading,.admin-heading,.paid-viewer-heading,.cta{align-items:flex-start;flex-wrap:wrap;gap:18px}
   .section-title,.paid-viewer-heading{display:flex;flex-direction:column}
-  .two-col,.request-modes,.application-modes,.booking-datetime,.applicant-facts,.payment-receipt,.review-timeline{grid-template-columns:minmax(0,1fr)!important}
+  .two-col,.request-modes,.application-modes,.booking-datetime,.applicant-facts,.payment-receipt{grid-template-columns:minmax(0,1fr)!important}
+  .review-timeline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%;max-width:520px;gap:12px}
+  .review-timeline>div{min-width:0}
+  .review-timeline>div:after{display:none}
   .filterbar{display:grid;grid-template-columns:minmax(0,1fr);overflow:visible}
   .filterbar .search-input,.filterbar .select-control,.select-control.compact,.filterbar>button{width:100%;max-width:none;min-width:0}
   .filterbar>button{min-height:46px;justify-content:center}
@@ -165,6 +181,7 @@ h1,h2,h3,h4,p,small,span,a,button,label{overflow-wrap:anywhere}
   .nav-wrap nav.open{top:66px;left:8px;right:8px}
   .hero{margin-inline:8px;padding:36px 16px;border-radius:22px;gap:34px}
   .hero h1,.page h1,.apply-page h1,.request-intro h1{font-size:clamp(36px,11.5vw,48px);line-height:1.02;letter-spacing:-2.5px}
+  .gate-copy h1,.application-success h1,.request-success h1,.admin-denied h1,.app-error h1,.payment-result h1,.resource-viewer-state h1{font-size:clamp(32px,10vw,40px);line-height:1.08;letter-spacing:-1.8px}
   .hero-copy>p,.apply-copy>p{font-size:15px}
   .hero-search{padding:5px}
   .hero-visual{height:min(104vw,390px);min-height:300px}
@@ -178,10 +195,12 @@ h1,h2,h3,h4,p,small,span,a,button,label{overflow-wrap:anywhere}
   .mode-row{gap:7px}
   .mode-row span{font-size:10px}
   .trust-strip{margin-inline:8px;padding-inline:14px}
+  .trust-strip{grid-template-columns:minmax(0,1fr);gap:14px;text-align:center}
   .section,.apply-page,.paid-viewer{padding-inline:16px}
   .section{padding-block:58px}
   .section h2,.cta h2,.paid-viewer-notes h2{font-size:clamp(29px,9vw,36px);letter-spacing:-1.5px}
   .course-card,.tutor-card,.paid-resource-card{border-radius:17px}
+  .course-grid,.tutor-grid,.resource-grid,.paid-resource-grid{grid-template-columns:minmax(0,1fr)}
   .tutor-photo{height:min(88vw,330px)}
   .learn-image{height:min(82vw,320px)}
   .step{padding:27px 22px}
@@ -214,6 +233,11 @@ h1,h2,h3,h4,p,small,span,a,button,label{overflow-wrap:anywhere}
   .auth-form h1{font-size:clamp(31px,10vw,38px)}
   .auth-form .back{margin-bottom:28px}
   .social-auth-grid button{height:auto;min-height:52px;padding-inline:12px}
+  .empty,.paid-library-empty{min-height:210px;padding:38px 18px}
+  .application-actions{display:grid;grid-template-columns:minmax(0,1fr)}
+  .application-actions button{width:100%!important}
+  .payment-result-actions{width:100%;flex-direction:column}
+  .payment-result-actions .outline-btn{width:100%}
   .outcomes{grid-template-columns:minmax(0,1fr);margin-inline:8px}
   .outcomes>div,.outcomes>div:nth-child(3){border-left:0;border-top:1px solid var(--line);padding:14px 0 0}
   .outcomes>div:first-child{border-top:0;padding-top:0}
@@ -241,4 +265,13 @@ h1,h2,h3,h4,p,small,span,a,button,label{overflow-wrap:anywhere}
   .auth-quote{bottom:28px}
   .auth-form{padding-block:26px}
   .auth-form .back{margin-bottom:25px}
+}
+
+@media(max-height:650px) and (min-width:901px){
+  .hero{min-height:0;padding-block:32px}
+  .hero h1{font-size:clamp(42px,4.7vw,58px);margin-block:15px}
+  .hero-copy>p{font-size:15px;line-height:1.5}
+  .hero-search{margin-top:20px}
+  .hero-visual{height:calc(100svh - 150px);min-height:360px;max-height:470px}
+  .mode-row{margin-top:13px}
 }
