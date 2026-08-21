@@ -126,6 +126,42 @@ function GoogleIcon() {
   );
 }
 
+function StudyConstellation({ variant = "hero" }) {
+  return (
+    <div className={`study-constellation constellation-${variant}`} aria-hidden="true">
+      <svg viewBox="0 0 360 280" role="presentation">
+        <defs>
+          <linearGradient id={`orbit-${variant}`} x1="0" y1="0" x2="1" y2="1">
+            <stop stopColor="#f3c861" />
+            <stop offset="1" stopColor="#6fa58d" />
+          </linearGradient>
+          <filter id={`glow-${variant}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <ellipse className="constellation-orbit orbit-a" cx="180" cy="140" rx="138" ry="66" />
+        <ellipse className="constellation-orbit orbit-b" cx="180" cy="140" rx="104" ry="112" />
+        <path className="constellation-path" d="M50 163C97 94 150 205 211 117s91-30 103-1" />
+        <g className="constellation-book">
+          <path d="M124 112c21-9 39-5 56 9v71c-17-14-35-18-56-9z" />
+          <path d="M236 112c-21-9-39-5-56 9v71c17-14 35-18 56-9z" />
+          <path d="M180 121v71" />
+        </g>
+        <g className="constellation-play">
+          <circle cx="263" cy="75" r="25" />
+          <path d="m257 64 17 11-17 11z" />
+        </g>
+        <circle className="constellation-dot dot-a" cx="56" cy="159" r="7" filter={`url(#glow-${variant})`} />
+        <circle className="constellation-dot dot-b" cx="293" cy="181" r="6" filter={`url(#glow-${variant})`} />
+        <circle className="constellation-dot dot-c" cx="153" cy="52" r="5" filter={`url(#glow-${variant})`} />
+        <path className="constellation-spark spark-a" d="M77 65v20M67 75h20" />
+        <path className="constellation-spark spark-b" d="M286 218v16M278 226h16" />
+      </svg>
+    </div>
+  );
+}
+
 function SocialAuth({ onSelect }) {
   return (
     <div className="social-auth">
@@ -392,6 +428,7 @@ function Home({ nav, items = tutors, user }) {
             src="/assets/x-IgUR1iX0mqM-unsplash.jpg"
             alt="University students learning together"
           />
+          <StudyConstellation variant="hero" />
           <div className="hero-badge">
             <span className="gold-icon">
               <Star fill="currentColor" />
@@ -1086,6 +1123,7 @@ function PastQuestionsPage({ nav, user }) {
       <div className="paid-library-hero">
         <div><span className="overline">PAST QUESTIONS + VIDEO SOLUTIONS</span><h1>Practise the question.<br/>Understand the solution.</h1><p>Affordable past questions from approved tutors, paired with clear video walkthroughs.</p></div>
         <div className="paid-library-actions">
+          <StudyConstellation variant="library" />
           {approvedTutor ? <button className="gold-btn" onClick={() => setShowSubmit(!showSubmit)}>{showSubmit ? "Close submission" : "Publish a resource"}</button> : <button className="outline-btn" onClick={() => nav(user ? "/become-a-tutor" : "/auth/login")}>{user ? "Become an approved tutor" : "Tutor sign in"}</button>}
         </div>
       </div>
@@ -1422,6 +1460,7 @@ function AuthPage({ kind, onAuth }) {
         <div className="auth-brand">
           <Logo />
         </div>
+        <StudyConstellation variant="auth" />
         <div className="auth-quote">
           <div className="quote-mark">“</div>
           <blockquote>
