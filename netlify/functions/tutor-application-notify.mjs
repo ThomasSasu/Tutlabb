@@ -3,8 +3,8 @@ const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (char) => (
 
 export default async (request) => {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
-  const url = process.env.SUPABASE_URL;
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tmfwkaqtssicezuwgzch.supabase.co";
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
   const resendKey = process.env.RESEND_API_KEY;
   const reviewer = process.env.REVIEWER_EMAIL || "ansongsx@gmail.com";
   const from = process.env.EMAIL_FROM;

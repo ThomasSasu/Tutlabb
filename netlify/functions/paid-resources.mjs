@@ -4,9 +4,9 @@ const reply = (body, status = 200) => Response.json(body, { status, headers: { "
 
 export default async (request) => {
   if (request.method !== "GET") return reply({ error: "Method not allowed." }, 405);
-  const url = process.env.SUPABASE_URL;
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !secret) return reply({ error: "The resource library is not configured." }, 503);
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tmfwkaqtssicezuwgzch.supabase.co";
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  if (!secret) return reply({ error: "Netlify Functions cannot see SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY." }, 503);
   const db = createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } });
 
   const { data: resources, error } = await db

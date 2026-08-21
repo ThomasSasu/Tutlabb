@@ -5,8 +5,8 @@ const clean = (value, max) => String(value || "").trim().slice(0, max);
 
 export default async (request) => {
   if (request.method !== "POST") return reply({ error: "Method not allowed." }, 405);
-  const url = process.env.SUPABASE_URL;
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tmfwkaqtssicezuwgzch.supabase.co";
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
   if (!url || !secret) return reply({ error: "The resource submission service is not configured." }, 503);
   const db = createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } });
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");

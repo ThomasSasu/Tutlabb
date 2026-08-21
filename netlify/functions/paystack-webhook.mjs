@@ -6,9 +6,9 @@ const response = (body, status = 200) =>
 
 export default async (request) => {
   if (request.method !== "POST") return response({ error: "Method not allowed." }, 405);
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tmfwkaqtssicezuwgzch.supabase.co";
+  const supabaseSecret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  const paystackSecret = process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET;
   if (!supabaseUrl || !supabaseSecret || !paystackSecret)
     return response({ error: "Payment webhook is not configured." }, 503);
 

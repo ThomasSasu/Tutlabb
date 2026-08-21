@@ -5,9 +5,9 @@ const reply = (body, status = 200) => Response.json(body, { status, headers: { "
 
 export default async (request) => {
   if (request.method !== "POST") return reply({ error: "Method not allowed." }, 405);
-  const url = process.env.SUPABASE_URL;
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tmfwkaqtssicezuwgzch.supabase.co";
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  const paystackSecret = process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET;
   const appUrl = (process.env.APP_URL || "https://tutlabb.netlify.app").replace(/\/$/, "");
   if (!url || !secret || !paystackSecret) return reply({ error: "The payment service is not configured." }, 503);
   const db = createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } });
